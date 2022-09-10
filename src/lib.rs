@@ -13,8 +13,6 @@ pub enum RispErr {
     Reason(String),
 }
 
-type RispFunc = fn(&[RispExp]) -> Result<RispExp, RispErr>;
-
 pub fn tokenize(expr: &str) -> Vec<String> {
     expr.replace('(', " ( ")
         .replace(')', " ) ")
@@ -81,7 +79,7 @@ pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
                 RispExp::Symbol(p) => {
                     // Handle procedures
                     let f = env.funcs.get(p).expect("failed to find function");
-                    f(rest)
+                    f(rest, env)
                 },
                 _ => {
                     Err(RispErr::Reason(format!("{:?} not implemented", first)))
@@ -94,12 +92,17 @@ pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::env::standard_env;
 
     #[test]
     fn test_tokenize() {
         let expr = "(+ 10 5)";
         assert_eq!(tokenize(expr), vec!["(", "+", "10", "5", ")"]);
+
+        let expr = "(begin (define r 10) (* pi (* r r)))";
+        assert_eq!(tokenize(expr),
+            vec!["(", "begin", "(", "define", "r", "10", ")", "(", "*", "pi",
+                 "(", "*", "r", "r", ")", ")", ")"
+            ]);
     }
 
     #[test]
@@ -129,18 +132,5 @@ mod tests {
             ]),
         ]);
         assert_eq!(output, truth);
-    }
-
-    #[test]
-    fn test_add() {
-        let expr = "(+ 10 5)";
-        let mut env = standard_env();
-        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
-        assert_eq!(output, RispExp::Number(15_f64));
-
-        let expr = "(+ 10 5 3 1 -12)";
-        let mut env = standard_env();
-        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
-        assert_eq!(output, RispExp::Number(7_f64));
     }
 }
