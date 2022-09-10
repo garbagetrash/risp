@@ -2,7 +2,7 @@ use std::fmt;
 pub mod env;
 pub use env::{RispEnv, standard_env};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum RispExp {
     Bool(bool),
     Symbol(String),
@@ -119,6 +119,18 @@ pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
                 },
             }
         },
+    }
+}
+
+pub fn eval_to_number(x: &RispExp, env: &mut RispEnv) -> Result<f64, RispErr> {
+    match eval(x.clone(), env) {
+        Ok(re) => {
+            match re {
+                RispExp::Number(n) => Ok(n),
+                _ => Err(RispErr::Reason(format!("{:?} did not eval to a number", x))),
+            }
+        },
+        Err(rerr) => Err(rerr),
     }
 }
 

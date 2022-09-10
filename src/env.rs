@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::{eval, RispErr, RispExp};
+use crate::{eval, eval_to_number, RispErr, RispExp};
 
 type RispFunc = fn(&[RispExp], &mut RispEnv) -> Result<RispExp, RispErr>;
 
@@ -57,13 +57,10 @@ pub fn risp_sub(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr>
     let num1 = match first {
         RispExp::Number(v) => *v,
         RispExp::List(_) => {
-            if let Ok(expr) = eval(first.clone(), env) {
-                match expr {
-                    RispExp::Number(n) => n,
-                    _ => return Err(RispErr::Reason(format!("{:?} not a number", expr))),
-                }
-            } else {
-                return Err(RispErr::Reason(format!("{:?} not a number", first)));
+            let expr = eval(first.clone(), env)?;
+            match expr {
+                RispExp::Number(n) => n,
+                _ => return Err(RispErr::Reason(format!("{:?} not a number", expr))),
             }
         },
         _ => return Err(RispErr::Reason(format!("{:?} not a number", first))),
@@ -88,7 +85,7 @@ pub fn risp_sub(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr>
     Ok(RispExp::Number(num1 - sum_right))
 }
 
-pub fn risp_eq(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+pub fn risp_eq(args: &[RispExp], _env: &mut RispEnv) -> Result<RispExp, RispErr> {
     let (left, others) = args.split_first().expect("`=` requires at least 2 arguments");
 
     for other in others {
@@ -100,13 +97,80 @@ pub fn risp_eq(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> 
     Ok(RispExp::Bool(true))
 }
 
+pub fn risp_neq(args: &[RispExp], _env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (left, others) = args.split_first().expect("`!=` requires at least 2 arguments");
 
+    for other in others {
+        if left != other {
+            return Ok(RispExp::Bool(true));
+        }
+    }
+
+    Ok(RispExp::Bool(false))
+}
+
+pub fn risp_gt(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (left, others) = args.split_first().expect("`>` requires at least 2 arguments");
+
+    let left = eval_to_number(left, env)?;
+    for other in others {
+        let other = eval_to_number(other, env)?;
+        if left <= other {
+            return Ok(RispExp::Bool(false));
+        }
+    }
+
+    Ok(RispExp::Bool(true))
+}
+
+pub fn risp_gte(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (left, others) = args.split_first().expect("`>=` requires at least 2 arguments");
+
+    let left = eval_to_number(left, env)?;
+    for other in others {
+        let other = eval_to_number(other, env)?;
+        if left < other {
+            return Ok(RispExp::Bool(false));
+        }
+    }
+
+    Ok(RispExp::Bool(true))
+}
+
+pub fn risp_lt(args: &[RispExp], _env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (left, others) = args.split_first().expect("`<` requires at least 2 arguments");
+
+    for other in others {
+        if left >= other {
+            return Ok(RispExp::Bool(false));
+        }
+    }
+
+    Ok(RispExp::Bool(true))
+}
+
+pub fn risp_lte(args: &[RispExp], _env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (left, others) = args.split_first().expect("`<=` requires at least 2 arguments");
+
+    for other in others {
+        if left > other {
+            return Ok(RispExp::Bool(false));
+        }
+    }
+
+    Ok(RispExp::Bool(true))
+}
 
 pub fn standard_env() -> RispEnv {
     let mut env = RispEnv::default();
     env.define_procedure("+", risp_add as RispFunc);
     env.define_procedure("-", risp_sub as RispFunc);
     env.define_procedure("=", risp_eq as RispFunc);
+    env.define_procedure("!=", risp_neq as RispFunc);
+    env.define_procedure(">", risp_gt as RispFunc);
+    env.define_procedure(">=", risp_gte as RispFunc);
+    env.define_procedure("<", risp_lt as RispFunc);
+    env.define_procedure("<=", risp_lte as RispFunc);
     env
 }
 
