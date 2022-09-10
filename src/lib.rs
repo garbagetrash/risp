@@ -5,6 +5,7 @@ pub enum RispExp {
     Symbol(String),
     Number(f64),
     List(Vec<RispExp>),
+    Procedure(String), // use the string to do a function map lookup
 }
 
 #[derive(Debug, PartialEq)]
@@ -12,9 +13,12 @@ pub enum RispErr {
     Reason(String),
 }
 
+type RispFunc = fn(&[RispExp]) -> Result<RispExp, RispErr>;
+
 #[derive(Clone)]
 pub struct RispEnv {
     pub data: HashMap<String, RispExp>,
+    pub funcs: HashMap<String, RispFunc>,
 }
 
 pub fn tokenize(expr: &str) -> Vec<String> {
@@ -47,7 +51,6 @@ pub fn read_from_tokens(tokens: &[String]) -> Result<RispExp, RispErr> {
                 list.push(next_token);
                 (_, rest) = rest.split_at(tlen);
             }
-            (_, rest) = rest.split_first().expect("failed to pop first element");
             return Ok(RispExp::List(list));
         },
         ")" => Err(RispErr::Reason("unexpected `)`".to_string())),
@@ -63,8 +66,6 @@ pub fn parse_atom(token: &str) -> RispExp {
     }
 }
 
-type RispFunc = fn(&[RispExp]) -> Result<RispExp, RispErr>;
-
 pub fn risp_add(args: &[RispExp]) -> Result<RispExp, RispErr> {
     Ok(RispExp::Number(args.iter().map(|x| {
         match x {
@@ -74,14 +75,49 @@ pub fn risp_add(args: &[RispExp]) -> Result<RispExp, RispErr> {
     }).sum::<f64>()))
 }
 
-pub fn standard_env() -> HashMap<String, RispFunc> {
-    let mut env = HashMap::new();
-    env.insert("+".to_string(), risp_add as RispFunc);
-    env
+pub fn standard_env() -> RispEnv {
+    let mut datamap = HashMap::new();
+    let mut funcmap = HashMap::new();
+    let add_symbol = String::from("+");
+    datamap.insert(add_symbol.clone(), RispExp::Procedure(add_symbol.clone()));
+    funcmap.insert(add_symbol.clone(), risp_add as RispFunc);
+    RispEnv { data: datamap, funcs: funcmap }
 }
 
-pub fn eval(x: RispExp, env: HashMap<String, RispFunc>) -> RispExp {
-    RispExp::Symbol("X".to_string())
+pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    match x {
+        RispExp::Symbol(s) => {
+            // Variable lookup
+            if let Some(exp) = env.data.get(s.as_str()) {
+                return Ok(exp.clone());
+            } else {
+                return Err(RispErr::Reason("symbol not found".to_string()));
+            }
+        },
+        RispExp::Number(n) => {
+            // Numbers are already evaluated as far as we wish them to be
+            return Ok(x);
+        },
+        RispExp::List(v) => {
+            // Lists are special. Procedure calls, defines, flow control
+            let (first, rest) = v[..].split_first().expect("failed to split list");
+            match first {
+                RispExp::Procedure(p) => {
+                    // Handle procedures
+                    let f = env.funcs.get(p).expect("failed to find function");
+                    f(rest)
+                },
+                _ => {
+                    return Err(RispErr::Reason(format!("{:?} not implemented", first)));
+                },
+            }
+        },
+        RispExp::Procedure(p) => {
+            // Does this happen?
+            println!("Got naked procedure");
+            return Err(RispErr::Reason("not implemented".to_string()));
+        },
+    }
 }
 
 #[cfg(test)]
@@ -126,8 +162,10 @@ mod tests {
     #[test]
     fn test_add() {
         let expr = "(+ 10 5)";
-        let output = eval(parse(expr).expect("failed to parse"), standard_env());
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        println!("output {:?}", output);
 
-        assert_eq!(1, 1);
+        assert_eq!(output, RispExp::Number(15_f64));
     }
 }
