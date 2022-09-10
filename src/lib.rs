@@ -38,8 +38,6 @@ pub fn token_count(re: &RispExp) -> usize {
 
 pub fn read_from_tokens(tokens: &[String]) -> Result<RispExp, RispErr> {
     let (token, mut rest) = tokens.split_first().expect("failed to pop from tokens");
-    println!("\ntoken: {:?}", token);
-    println!("rest: {:?}", rest);
     match token.as_str() {
         "(" => {
             let mut list = vec![];
@@ -50,8 +48,6 @@ pub fn read_from_tokens(tokens: &[String]) -> Result<RispExp, RispErr> {
                 (_, rest) = rest.split_at(tlen);
             }
             (_, rest) = rest.split_first().expect("failed to pop first element");
-            println!("list: {:?}", list);
-            println!("rest: {:?}", rest);
             return Ok(RispExp::List(list));
         },
         ")" => Err(RispErr::Reason("unexpected `)`".to_string())),
@@ -65,6 +61,27 @@ pub fn parse_atom(token: &str) -> RispExp {
         Ok(v) => RispExp::Number(v),
         Err(_) => RispExp::Symbol(token.to_string().clone()),
     }
+}
+
+type RispFunc = fn(&[RispExp]) -> Result<RispExp, RispErr>;
+
+pub fn risp_add(args: &[RispExp]) -> Result<RispExp, RispErr> {
+    Ok(RispExp::Number(args.iter().map(|x| {
+        match x {
+            RispExp::Number(v) => v,
+            _ => panic!("not a number"),
+        }
+    }).sum::<f64>()))
+}
+
+pub fn standard_env() -> HashMap<String, RispFunc> {
+    let mut env = HashMap::new();
+    env.insert("+".to_string(), risp_add as RispFunc);
+    env
+}
+
+pub fn eval(x: RispExp, env: HashMap<String, RispFunc>) -> RispExp {
+    RispExp::Symbol("X".to_string())
 }
 
 #[cfg(test)]
@@ -104,5 +121,13 @@ mod tests {
             ]),
         ]);
         assert_eq!(output, truth);
+    }
+
+    #[test]
+    fn test_add() {
+        let expr = "(+ 10 5)";
+        let output = eval(parse(expr).expect("failed to parse"), standard_env());
+
+        assert_eq!(1, 1);
     }
 }
