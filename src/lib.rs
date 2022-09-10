@@ -1,16 +1,42 @@
+use std::fmt;
 pub mod env;
 pub use env::{RispEnv, standard_env};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum RispExp {
+    Bool(bool),
     Symbol(String),
     Number(f64),
     List(Vec<RispExp>),
 }
 
+impl fmt::Display for RispExp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let str_rep = match self {
+            RispExp::Bool(b) => b.to_string(),
+            RispExp::Symbol(s) => s.clone(),
+            RispExp::Number(n) => n.to_string(),
+            RispExp::List(v) => {
+                let xs: Vec<_> = v.iter().map(|x| x.to_string()).collect();
+                format!("({})", xs.join(","))
+            },
+        };
+
+        write!(f, "{}", str_rep)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum RispErr {
     Reason(String),
+}
+
+impl fmt::Display for RispErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RispErr::Reason(s) => write!(f, "Error: {}", s),
+        }
+    }
 }
 
 pub fn tokenize(expr: &str) -> Vec<String> {
@@ -51,15 +77,22 @@ pub fn read_from_tokens(tokens: &[String]) -> Result<RispExp, RispErr> {
 }
 
 pub fn parse_atom(token: &str) -> RispExp {
-    let potential_float = token.parse();
-    match potential_float {
-        Ok(v) => RispExp::Number(v),
-        Err(_) => RispExp::Symbol(token.to_string()),
+    match token {
+        "true" => RispExp::Bool(true),
+        "false" => RispExp::Bool(false),
+        _ => {
+            let potential_float = token.parse();
+            match potential_float {
+                Ok(v) => RispExp::Number(v),
+                Err(_) => RispExp::Symbol(token.to_string()),
+            }
+        }
     }
 }
 
 pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
     match x {
+        RispExp::Bool(_b) => Ok(x.clone()),
         RispExp::Symbol(s) => {
             // Variable lookup
             if let Some(exp) = env.data.get(s.as_str()) {

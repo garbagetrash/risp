@@ -34,20 +34,22 @@ impl Default for RispEnv {
 }
 
 pub fn risp_add(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
-    Ok(RispExp::Number(args.iter().map(|x| {
-        *match x {
-            RispExp::Number(v) => v,
+    let mut total = 0.0;
+    for arg in args {
+        match arg {
+            RispExp::Number(v) => total += v,
             RispExp::List(_) => {
-                let expr = eval(x.clone(), env).expect("failed to eval list");
+                let expr = eval(arg.clone(), env).expect("failed to eval list");
                 if let RispExp::Number(n) = expr {
-                    return n;
+                    total += n;
                 } else {
-                    panic!("not a number");
+                    return Err(RispErr::Reason(format!("{:?} not a number", arg)));
                 }
             },
-            _ => panic!("not a number"),
+            _ => return Err(RispErr::Reason(format!("{:?} not a number", arg))),
         }
-    }).sum::<f64>()))
+    }
+    Ok(RispExp::Number(total))
 }
 
 pub fn risp_sub(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
@@ -58,36 +60,53 @@ pub fn risp_sub(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr>
             if let Ok(expr) = eval(first.clone(), env) {
                 match expr {
                     RispExp::Number(n) => n,
-                    _ => panic!("not a number"),
+                    _ => return Err(RispErr::Reason(format!("{:?} not a number", expr))),
                 }
             } else {
-                panic!("failed to eval first");
+                return Err(RispErr::Reason(format!("{:?} not a number", first)));
             }
         },
-        _ => panic!("not a number"),
+        _ => return Err(RispErr::Reason(format!("{:?} not a number", first))),
     };
 
-    let num2 = rest_nums.iter().map(|x| {
-        *match x {
-            RispExp::Number(v) => v,
+    let mut sum_right = 0.0;
+    for num in rest_nums {
+        match num {
+            RispExp::Number(v) => sum_right += v,
             RispExp::List(_) => {
-                let expr = eval(x.clone(), env).expect("failed to eval list");
+                let expr = eval(num.clone(), env).expect("failed to eval list");
                 if let RispExp::Number(n) = expr {
-                    return n;
+                    sum_right += n;
                 } else {
-                    panic!("not a number");
+                    return Err(RispErr::Reason(format!("{:?} not a number", num)));
                 }
             },
-            _ => panic!("not a number"),
+            _ => return Err(RispErr::Reason(format!("{:?} not a number", num))),
         }
-    }).sum::<f64>();
-    Ok(RispExp::Number(num1 - num2))
+    }
+
+    Ok(RispExp::Number(num1 - sum_right))
 }
+
+pub fn risp_eq(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (left, others) = args.split_first().expect("`=` requires at least 2 arguments");
+
+    for other in others {
+        if left != other {
+            return Ok(RispExp::Bool(false));
+        }
+    }
+
+    Ok(RispExp::Bool(true))
+}
+
+
 
 pub fn standard_env() -> RispEnv {
     let mut env = RispEnv::default();
     env.define_procedure("+", risp_add as RispFunc);
     env.define_procedure("-", risp_sub as RispFunc);
+    env.define_procedure("=", risp_eq as RispFunc);
     env
 }
 
