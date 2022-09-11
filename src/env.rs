@@ -5,8 +5,9 @@ type RispFunc = fn(&[RispExp], &mut RispEnv) -> Result<RispExp, RispErr>;
 
 #[derive(Clone)]
 pub struct RispEnv {
-    pub data: HashMap<String, RispExp>,
-    pub funcs: HashMap<String, RispFunc>,
+    data: HashMap<String, RispExp>,
+    funcs: HashMap<String, RispFunc>,
+    pub outer: Option<Box<RispEnv>>,
 }
 
 impl RispEnv {
@@ -14,6 +15,7 @@ impl RispEnv {
         Self {
             data: HashMap::new(),
             funcs: HashMap::new(),
+            outer: None,
         }
     }
 
@@ -24,6 +26,38 @@ impl RispEnv {
 
     pub fn define_variable(&mut self, symbol: &str, var: &RispExp) {
         self.data.insert(symbol.to_string(), var.clone());
+    }
+
+    pub fn define_lambda(&mut self, symbol: &str, params: &[&str], proc: RispFunc) {
+
+    }
+
+    pub fn get(&self, symbol: &str) -> Option<RispExp> {
+        if let Some(s) = self.data.get(symbol) {
+            Some(s.clone())
+        } else if let Some(outer) = &self.outer {
+            if let Some(s) = outer.get(symbol) {
+                Some(s.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn get_function(&self, symbol: &str) -> Option<RispFunc> {
+        if let Some(s) = self.funcs.get(symbol) {
+            Some(s.clone())
+        } else if let Some(outer) = &self.outer {
+            if let Some(s) = outer.get_function(symbol) {
+                Some(s.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -64,6 +98,18 @@ pub fn risp_let(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr>
         },
         _ => Err(RispErr::Reason(format!("{:?} does not evaluate to a symbol", symbol))),
     }
+}
+
+pub fn risp_lambda(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (params, func) = args.split_first().expect("`lambda` requires at least 2 arguments");
+
+    let params = if let RispExp::List(_v) = params {
+        params
+    } else {
+        return Err(RispErr::Reason(format!("params {:?} does not evaluate to a List", params)));
+    };
+
+    todo!();
 }
 
 pub fn risp_add(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
@@ -188,6 +234,7 @@ pub fn standard_env() -> RispEnv {
     let mut env = RispEnv::default();
     env.define_procedure("if", risp_if as RispFunc);
     env.define_procedure("let", risp_let as RispFunc);
+    env.define_procedure("lambda", risp_lambda as RispFunc);
     env.define_procedure("+", risp_add as RispFunc);
     env.define_procedure("-", risp_sub as RispFunc);
     env.define_procedure("=", risp_eq as RispFunc);
@@ -327,5 +374,27 @@ mod tests {
         let expr = "a";
         let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
         assert_eq!(output, RispExp::Number(42.0));
+    }
+
+    #[test]
+    fn test_outer_env() {
+        let mut env = standard_env();
+        let expr = "(let b 5)";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(5.0));
+
+        let mut inner_env = RispEnv::new();
+        inner_env.outer = Some(Box::new(env));
+        let expr = "(let a 3)";
+        let output = eval(parse(expr).expect("failed to parse"), &mut inner_env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(3.0));
+
+        let expr = "a";
+        let output = eval(parse(expr).expect("failed to parse"), &mut inner_env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(3.0));
+
+        let expr = "b";
+        let output = eval(parse(expr).expect("failed to parse"), &mut inner_env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(5.0));
     }
 }

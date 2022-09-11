@@ -96,7 +96,7 @@ pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
         RispExp::Bool(_b) => Ok(x.clone()),
         RispExp::Symbol(s) => {
             // Variable lookup
-            if let Some(exp) = env.data.get(s.as_str()) {
+            if let Some(exp) = env.get(s.as_str()) {
                 Ok(exp.clone())
             } else {
                 Ok(RispExp::Symbol(s))
@@ -112,7 +112,7 @@ pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
             match first {
                 RispExp::Symbol(p) => {
                     // Handle procedures
-                    let f = env.funcs.get(p).expect("failed to find function");
+                    let f = env.get_function(p).expect(&format!("failed to find function {:?}", first));
                     f(rest, env)
                 },
                 _ => {
