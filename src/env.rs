@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::f64;
 use crate::{eval, eval_to_number, RispErr, RispExp};
 
 type RispFunc = fn(&[RispExp], &mut RispEnv) -> Result<RispExp, RispErr>;
@@ -7,7 +8,6 @@ type RispFunc = fn(&[RispExp], &mut RispEnv) -> Result<RispExp, RispErr>;
 pub struct RispEnv<'a> {
     data: HashMap<String, RispExp>,
     funcs: HashMap<String, RispFunc>,
-    lambdas: HashMap<String, (Vec<RispExp>, Vec<RispExp>)>,
     pub outer: Option<&'a RispEnv<'a>>,
 }
 
@@ -16,7 +16,6 @@ impl<'a> RispEnv<'a> {
         Self {
             data: HashMap::new(),
             funcs: HashMap::new(),
-            lambdas: HashMap::new(),
             outer: None,
         }
     }
@@ -112,7 +111,7 @@ pub fn risp_add(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr>
     Ok(RispExp::Number(total))
 }
 
-pub fn risp_sub(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+pub fn risp_subtract(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
     //println!("- args: {:?}", args);
     let (first, rest_nums) = args.split_first().expect("`-` requires at least 2 arguments");
     let num1 = if let Ok(n) = eval_to_number(first, env) {
@@ -133,6 +132,203 @@ pub fn risp_sub(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr>
     }
 
     Ok(RispExp::Number(num1 - sum_right))
+}
+
+pub fn risp_multiply(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let mut total = 1.0;
+    for arg in args {
+        if let Ok(n) = eval_to_number(arg, env) {
+            total *= n;
+        } else {
+            return Err(RispErr::Reason(format!("{:?} not a number", arg)));
+        };
+    }
+    Ok(RispExp::Number(total))
+}
+
+pub fn risp_divide(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (first, rest_nums) = args.split_first().expect("`/` requires at least 2 arguments");
+    if rest_nums.len() > 1 {
+        return Err(RispErr::Reason("`/` takes exactly 2 arguments".to_string()));
+    }
+
+    let numerator = if let Ok(n) = eval_to_number(first, env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", first)));
+    };
+
+    let denominator = if let Ok(n) = eval_to_number(&rest_nums[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", first)));
+    };
+
+    Ok(RispExp::Number(numerator / denominator))
+}
+
+pub fn risp_cosine(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`cos` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.cos()))
+}
+
+pub fn risp_sine(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`sin` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.sin()))
+}
+
+pub fn risp_tangent(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`tan` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.tan()))
+}
+
+pub fn risp_acos(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`acos` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.acos()))
+}
+
+pub fn risp_asin(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`asin` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.asin()))
+}
+
+pub fn risp_atan(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`atan` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.atan()))
+}
+
+pub fn risp_log(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`log` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.ln()))
+}
+
+pub fn risp_log2(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`log2` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.log2()))
+}
+
+pub fn risp_log10(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`log10` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.log10()))
+}
+
+pub fn risp_sqrt(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`sqrt` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.sqrt()))
+}
+
+pub fn risp_exp(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`exp` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.exp()))
+}
+
+pub fn risp_abs(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() > 1 {
+        return Err(RispErr::Reason("`abs` takes exactly 1 argument".to_string()));
+    }
+    let num = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+    Ok(RispExp::Number(num.abs()))
+}
+
+pub fn risp_pow(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    if args.len() != 2 {
+        return Err(RispErr::Reason("`pow` takes exactly 2 arguments".to_string()));
+    }
+
+    let base = if let Ok(n) = eval_to_number(&args[0], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[0])));
+    };
+
+    let power = if let Ok(n) = eval_to_number(&args[1], env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", args[1])));
+    };
+
+    Ok(RispExp::Number(base.powf(power)))
 }
 
 pub fn risp_eq(args: &[RispExp], _env: &mut RispEnv) -> Result<RispExp, RispErr> {
@@ -213,11 +409,27 @@ pub fn risp_lte(args: &[RispExp], _env: &mut RispEnv) -> Result<RispExp, RispErr
 
 pub fn standard_env<'a>() -> RispEnv<'a> {
     let mut env = RispEnv::default();
+    env.define_variable("pi", &RispExp::Number(f64::consts::PI));
     env.define_procedure("if", risp_if as RispFunc);
     env.define_procedure("let", risp_let as RispFunc);
     env.define_procedure("fn", risp_lambda as RispFunc);
     env.define_procedure("+", risp_add as RispFunc);
-    env.define_procedure("-", risp_sub as RispFunc);
+    env.define_procedure("-", risp_subtract as RispFunc);
+    env.define_procedure("*", risp_multiply as RispFunc);
+    env.define_procedure("/", risp_divide as RispFunc);
+    env.define_procedure("cos", risp_cosine as RispFunc);
+    env.define_procedure("sin", risp_sine as RispFunc);
+    env.define_procedure("tan", risp_tangent as RispFunc);
+    env.define_procedure("acos", risp_acos as RispFunc);
+    env.define_procedure("asin", risp_asin as RispFunc);
+    env.define_procedure("atan", risp_atan as RispFunc);
+    env.define_procedure("log", risp_log as RispFunc);
+    env.define_procedure("log2", risp_log2 as RispFunc);
+    env.define_procedure("log10", risp_log10 as RispFunc);
+    env.define_procedure("sqrt", risp_sqrt as RispFunc);
+    env.define_procedure("exp", risp_exp as RispFunc);
+    env.define_procedure("abs", risp_abs as RispFunc);
+    env.define_procedure("pow", risp_pow as RispFunc);
     env.define_procedure("=", risp_eq as RispFunc);
     env.define_procedure("!=", risp_neq as RispFunc);
     env.define_procedure(">", risp_gt as RispFunc);
@@ -230,6 +442,7 @@ pub fn standard_env<'a>() -> RispEnv<'a> {
 #[cfg(test)]
 mod tests {
     use crate::*;
+    use std::f64;
 
     #[test]
     fn test_add() {
@@ -250,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sub() {
+    fn test_subtract() {
         let expr = "(- 10 5)";
         let mut env = standard_env();
         let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
@@ -260,6 +473,72 @@ mod tests {
         let mut env = standard_env();
         let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
         assert_eq!(output, RispExp::Number(13_f64));
+    }
+
+    #[test]
+    fn test_multiply() {
+        let expr = "(* 10 5)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(50_f64));
+
+        let expr = "(* 10 (- 8 3) 3 1)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(150_f64));
+    }
+
+    #[test]
+    fn test_divide() {
+        let expr = "(/ 10 5)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(2_f64));
+
+        let expr = "(/ 150 (- 8 3))";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(30_f64));
+    }
+
+    #[test]
+    fn test_trigonometry() {
+        let expr = "(cos 0)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(1_f64));
+
+        let expr = "(cos pi)";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(-1_f64));
+
+        let expr = "(sin 0)";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(0_f64));
+
+        let expr = "(sin (/ pi 2))";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(1_f64));
+
+        let expr = "(tan 0)";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(0_f64));
+
+        let expr = "(tan (/ pi 4))";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number((f64::consts::PI / 4.0).tan()));
+
+        let expr = "(tan (atan (/ pi 4)))";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(f64::consts::PI / 4.0));
+
+        let expr = "(cos (acos (/ pi 4)))";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(f64::consts::PI / 4.0));
+
+        let expr = "(sin (asin (/ pi 4)))";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(f64::consts::PI / 4.0));
     }
 
     #[test]
