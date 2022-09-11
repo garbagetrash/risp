@@ -33,6 +33,39 @@ impl Default for RispEnv {
     }
 }
 
+pub fn risp_if(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (predicate, alternatives) = args.split_first().expect("`if` requires at least 3 arguments");
+    let predicate = eval(predicate.clone(), env).expect("failed to evaluate predicate");
+    match predicate {
+        RispExp::Bool(truth) => {
+            if truth {
+                // true
+                eval(alternatives[0].clone(), env)
+            } else {
+                // false
+                eval(alternatives[1].clone(), env)
+            }
+
+        },
+        _ => Err(RispErr::Reason(format!("{:?} does not evaluate to a boolean", predicate))),
+    }
+}
+
+pub fn risp_let(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    let (symbol, expr) = args.split_first().expect("`let` requires at least 3 arguments");
+    // The fact that we don't eval(symbol) means the first argument has to be
+    // the symbol alone, no fanciness with lists allowed.
+    match symbol {
+        RispExp::Symbol(s) => {
+            // NOTE: we're tossing out expr[1..] here, intentionally.
+            let expr = eval(expr[0].clone(), env)?;
+            env.data.insert(s.clone(), expr.clone());
+            Ok(expr)
+        },
+        _ => Err(RispErr::Reason(format!("{:?} does not evaluate to a symbol", symbol))),
+    }
+}
+
 pub fn risp_add(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
     let mut total = 0.0;
     for arg in args {
@@ -53,33 +86,23 @@ pub fn risp_add(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr>
 }
 
 pub fn risp_sub(args: &[RispExp], env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    //println!("- args: {:?}", args);
     let (first, rest_nums) = args.split_first().expect("`-` requires at least 2 arguments");
-    let num1 = match first {
-        RispExp::Number(v) => *v,
-        RispExp::List(_) => {
-            let expr = eval(first.clone(), env)?;
-            match expr {
-                RispExp::Number(n) => n,
-                _ => return Err(RispErr::Reason(format!("{:?} not a number", expr))),
-            }
-        },
-        _ => return Err(RispErr::Reason(format!("{:?} not a number", first))),
+    let num1 = if let Ok(n) = eval_to_number(first, env) {
+        n
+    } else {
+        return Err(RispErr::Reason(format!("{:?} not a number", first)));
     };
 
     let mut sum_right = 0.0;
     for num in rest_nums {
-        match num {
-            RispExp::Number(v) => sum_right += v,
-            RispExp::List(_) => {
-                let expr = eval(num.clone(), env).expect("failed to eval list");
-                if let RispExp::Number(n) = expr {
-                    sum_right += n;
-                } else {
-                    return Err(RispErr::Reason(format!("{:?} not a number", num)));
-                }
-            },
-            _ => return Err(RispErr::Reason(format!("{:?} not a number", num))),
-        }
+        let num = if let Ok(n) = eval_to_number(num, env) {
+            n
+        } else {
+            return Err(RispErr::Reason(format!("{:?} not a number", first)));
+        };
+
+        sum_right += num;
     }
 
     Ok(RispExp::Number(num1 - sum_right))
@@ -163,6 +186,8 @@ pub fn risp_lte(args: &[RispExp], _env: &mut RispEnv) -> Result<RispExp, RispErr
 
 pub fn standard_env() -> RispEnv {
     let mut env = RispEnv::default();
+    env.define_procedure("if", risp_if as RispFunc);
+    env.define_procedure("let", risp_let as RispFunc);
     env.define_procedure("+", risp_add as RispFunc);
     env.define_procedure("-", risp_sub as RispFunc);
     env.define_procedure("=", risp_eq as RispFunc);
@@ -207,5 +232,100 @@ mod tests {
         let mut env = standard_env();
         let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
         assert_eq!(output, RispExp::Number(13_f64));
+    }
+
+    #[test]
+    fn test_bool() {
+        let expr = "(> 10 5 4 2 1 9)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(true));
+
+        let expr = "(> 10 5 4 2 11 9)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(false));
+
+        let expr = "(> 10 5 4 2 10 9)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(false));
+
+        let expr = "(= 10 10 10 10)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(true));
+
+        let expr = "(<= 3 5 7 5 3 5)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(true));
+
+        let expr = "(< 3 5 7 5 3 5)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(false));
+
+        let expr = "(!= 10 10 10 9 10)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(true));
+
+        let expr = "(!= 10 10 10 (+ 3 (+ 3 3)) 10)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(true));
+
+        let expr = "(!= 10 10 10 10)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Bool(false));
+    }
+
+    #[test]
+    fn test_if() {
+        let expr = "(if (!= 10 10 10 10) asdf 1)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(1.0));
+
+        let expr = "(if (= 10 10 10) asdf 1)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Symbol("asdf".to_string()));
+
+        let expr = "(if (< 10 11 9) asdf 1)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(1.0));
+
+        let expr = "(if (< 10 11 9) asdf (+ 1 (- 3 2)))";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(2.0));
+    }
+
+    #[test]
+    fn test_let() {
+        let expr = "(let a 3)";
+        let mut env = standard_env();
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(3.0));
+
+        let expr = "(let b 5)";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(5.0));
+
+        let expr = "(- b a)";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(2.0));
+
+        let expr = "(if (= a b) (let a 5) (let a 42))";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(42.0));
+
+        let expr = "a";
+        let output = eval(parse(expr).expect("failed to parse"), &mut env).expect("failed to eval");
+        assert_eq!(output, RispExp::Number(42.0));
     }
 }

@@ -91,6 +91,7 @@ pub fn parse_atom(token: &str) -> RispExp {
 }
 
 pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
+    //println!("eval() x: {:?}", x);
     match x {
         RispExp::Bool(_b) => Ok(x.clone()),
         RispExp::Symbol(s) => {
@@ -98,7 +99,7 @@ pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
             if let Some(exp) = env.data.get(s.as_str()) {
                 Ok(exp.clone())
             } else {
-                Err(RispErr::Reason("symbol not found".to_string()))
+                Ok(RispExp::Symbol(s))
             }
         },
         RispExp::Number(_n) => {
