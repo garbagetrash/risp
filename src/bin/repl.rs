@@ -11,7 +11,13 @@ fn main() {
         io::stdout().flush().expect("failed to flush stdout");
 
         let mut expr_str = String::new();
-        io::stdin().read_line(&mut expr_str).expect("failed to read line");
+        let nbytes = io::stdin().read_line(&mut expr_str).expect("failed to read line");
+
+        if nbytes == 0 {
+            // EOF on empty line means ctrl + d was hit, so bail
+            println!("");
+            break;
+        }
 
         // Handle some REPL type things first
         let trimmed = &expr_str.trim_end();
