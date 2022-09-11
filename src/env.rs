@@ -30,12 +30,6 @@ impl<'a> RispEnv<'a> {
         self.data.insert(symbol.to_string(), var.clone());
     }
 
-    pub fn define_lambda(&mut self, symbol: &str, params: &[RispExp], proc: &[RispExp]) {
-        // Lambda definition function requires 2 arguments, a params list and
-        // an expression list defining the function.
-        self.lambdas.insert(symbol.to_string(), (params.to_vec(), proc.to_vec()));
-    }
-
     pub fn get(&self, symbol: &str) -> Option<RispExp> {
         if let Some(s) = self.data.get(symbol) {
             Some(s.clone())
