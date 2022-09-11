@@ -8,6 +8,7 @@ pub enum RispExp {
     Symbol(String),
     Number(f64),
     List(Vec<RispExp>),
+    Lambda((Box<RispExp>, Box<RispExp>)),
 }
 
 impl fmt::Display for RispExp {
@@ -19,6 +20,9 @@ impl fmt::Display for RispExp {
             RispExp::List(v) => {
                 let xs: Vec<_> = v.iter().map(|x| x.to_string()).collect();
                 format!("({})", xs.join(","))
+            },
+            RispExp::Lambda((params, body)) => {
+                format!("{} {}", params, body)
             },
         };
 
@@ -97,7 +101,7 @@ pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
         RispExp::Symbol(s) => {
             // Variable lookup
             if let Some(exp) = env.get(s.as_str()) {
-                Ok(exp.clone())
+                Ok(exp)
             } else {
                 Ok(RispExp::Symbol(s))
             }
@@ -112,14 +116,53 @@ pub fn eval(x: RispExp, env: &mut RispEnv) -> Result<RispExp, RispErr> {
             match first {
                 RispExp::Symbol(p) => {
                     // Handle procedures
-                    let f = env.get_function(p).expect(&format!("failed to find function {:?}", first));
-                    f(rest, env)
+                    if let Some(f) = env.get_function(p) {
+                        f(rest, env)
+                    } else {
+                        // Handle lambdas
+                        if let Some(l) = env.get(p) {
+                            match l {
+                                RispExp::Lambda((params, body)) => {
+                                    let params = if let RispExp::List(pars) = *params {
+                                        pars
+                                    } else {
+                                        return Err(RispErr::Reason("lambda parameters must be a RispExp::List".to_string()));
+                                    };
+
+                                    if rest.len() != params.len() {
+                                        return Err(RispErr::Reason(
+                                            "length of passed args doesn't match expected parameters".to_string()
+                                            ));
+                                    }
+
+                                    // If we got here it seems things parsed correctly
+
+                                    // Create our inner scope, add parameters to it
+                                    let mut inner_scope = RispEnv::new();
+                                    for (sym, arg) in params.iter().zip(rest.iter()) {
+                                        if let RispExp::Symbol(s) = sym {
+                                            inner_scope.define_variable(s, arg)
+                                        } else {
+                                            return Err(RispErr::Reason("parameter RispExp didn't evaluate to symbol".to_string()));
+                                        }
+                                    }
+                                    inner_scope.outer = Some(env);
+
+                                    eval(*body, &mut inner_scope)
+                                },
+                                _ => Err(RispErr::Reason(format!("failed to find function or lambda {:?}", first))),
+                            }
+                        } else {
+                            Err(RispErr::Reason(format!("failed to find function or lambda {:?}", first)))
+                        }
+                    }
                 },
                 _ => {
                     Err(RispErr::Reason(format!("{:?} not implemented", first)))
                 },
             }
         },
+        RispExp::Lambda(_) => Err(RispErr::Reason("Unexpected form".to_string())),
     }
 }
 
