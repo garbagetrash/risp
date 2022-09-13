@@ -10,3 +10,9 @@ name = "repl"
 src = "bin/repl"
 
 [dependencies]
+comms-rs = { git = "https://github.com/ostrosco/comms-rs.git", optional = true }
+num = "0.4"
+rand = "0.8"
+
+[features]
+comms-rs = ["dep:comms-rs"]

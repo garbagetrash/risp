@@ -1,6 +1,9 @@
 use std::fmt;
 pub mod env;
-pub use env::{RispEnv, standard_env};
+pub use env::{RispEnv, RispFunc, standard_env};
+
+#[cfg(feature = "comms-rs")]
+pub mod comms;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum RispExp {

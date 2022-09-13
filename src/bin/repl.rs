@@ -3,8 +3,21 @@ use std::io::Write;
 
 use risp::*;
 
+#[cfg(feature = "comms-rs")]
+use risp::comms::*;
+
+#[cfg(feature = "comms-rs")]
+fn repl_env<'a>() -> RispEnv<'a> {
+    comms_env()
+}
+
+#[cfg(not(feature = "comms-rs"))]
+fn repl_env<'a>() -> RispEnv<'a> {
+    standard_env()
+}
+
 fn main() {
-    let mut env = standard_env();
+    let mut env = repl_env();
 
     loop {
         print!("risp > ");

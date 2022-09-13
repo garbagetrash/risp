@@ -1,14 +1,21 @@
 use std::collections::HashMap;
 use std::f64;
+use std::sync::{Arc, Mutex};
 use crate::{eval, eval_to_number, RispErr, RispExp};
 
-type RispFunc = fn(&[RispExp], &mut RispEnv) -> Result<RispExp, RispErr>;
+pub type RispFunc = fn(&[RispExp], &mut RispEnv) -> Result<RispExp, RispErr>;
+
+#[cfg(feature = "comms-rs")]
+use comms_rs::node::graph::Graph;
 
 #[derive(Clone)]
 pub struct RispEnv<'a> {
     data: HashMap<String, RispExp>,
     funcs: HashMap<String, RispFunc>,
     pub outer: Option<&'a RispEnv<'a>>,
+
+    #[cfg(feature = "comms-rs")]
+    pub comms_graphs: Vec<Arc<Mutex<Graph>>>,
 }
 
 impl<'a> RispEnv<'a> {
@@ -17,6 +24,8 @@ impl<'a> RispEnv<'a> {
             data: HashMap::new(),
             funcs: HashMap::new(),
             outer: None,
+            #[cfg(feature = "comms-rs")]
+            comms_graphs: vec![],
         }
     }
 
